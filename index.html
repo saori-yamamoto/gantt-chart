@@ -1724,17 +1724,17 @@
 
     function defaultTasks() {
       return [
-        makeTask("サイト制作", "ワイヤーフレーム"),
-        makeTask("サイト制作", "デザイン"),
-        makeTask("サイト制作", "コーディング"),
-        makeTask("SNS運用", "投稿案作成"),
-        makeTask("SNS運用", "画像作成"),
-        makeTask("", ""),
-        makeTask("", ""),
-        makeTask("", ""),
-        makeTask("", ""),
-        makeTask("", ""),
-        makeTask("", ""),
+        makeTask("Webサイトリニューアル", "要件整理"),
+        makeTask("", "ワイヤーフレーム"),
+        makeTask("", "デザイン確認"),
+        makeTask("", "コーディング"),
+        makeTask("SNSキャンペーン", "投稿案作成"),
+        makeTask("", "画像作成"),
+        makeTask("", "予約投稿"),
+        makeTask("業務改善", "ヒアリング"),
+        makeTask("", "テンプレ整備"),
+        makeTask("定例・MTG", "週次定例"),
+        makeTask("", "議事録作成"),
         makeTask("", "")
       ];
     }
@@ -1748,40 +1748,42 @@
       const monthStart = `${monthKey}-01`;
       const monthEnd = endOfMonthKey(monthKey);
       const selectedMonth = parseMonth(monthKey);
-      const midMonth = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 18));
+      const firstWeek = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 5));
+      const midMonth = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 12));
+      const lateMonth = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 21));
 
       return [
-        makeProjectItem("生成AIポータル", {
+        makeProjectItem("Webサイトリニューアル", {
           status: "active",
           priority: "高",
           startDate: monthStart,
           dueDate: monthEnd,
           progress: 45,
-          nextAction: "確認・整理"
+          nextAction: "ワイヤーフレーム確認"
         }),
-        makeProjectItem("AI Lab RN", {
+        makeProjectItem("SNSキャンペーン", {
           status: "waiting",
           priority: "中",
-          startDate: formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 8)),
-          dueDate: monthEnd,
-          progress: 65,
-          nextAction: "仕様確認"
+          startDate: firstWeek,
+          dueDate: lateMonth,
+          progress: 30,
+          nextAction: "投稿案レビュー"
         }),
-        makeProjectItem("次世代メディア", {
-          status: "active",
-          priority: "高",
-          startDate: midMonth,
-          dueDate: shiftDateKey(monthEnd, 7),
-          progress: 25,
-          nextAction: "記事整理"
-        }),
-        makeProjectItem("生成AI検証", {
+        makeProjectItem("業務改善", {
           status: "not-started",
           priority: "低",
-          startDate: shiftDateKey(monthStart, 21),
-          dueDate: shiftDateKey(monthEnd, 14),
+          startDate: midMonth,
+          dueDate: monthEnd,
           progress: 0,
-          nextAction: "検証項目整理"
+          nextAction: "ヒアリング準備"
+        }),
+        makeProjectItem("定例・MTG", {
+          status: "done",
+          priority: "低",
+          startDate: monthStart,
+          dueDate: monthEnd,
+          progress: 100,
+          nextAction: "週次定例"
         })
       ];
     }
