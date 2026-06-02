@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: gantt-chart
+    runtime: static
+    buildCommand: echo "No build step"
+    staticPublishPath: .
+    autoDeploy: true

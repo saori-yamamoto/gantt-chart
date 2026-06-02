@@ -1,0 +1,2940 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ガントチャート</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231769aa'/%3E%3Crect x='12' y='16' width='40' height='36' rx='5' fill='white'/%3E%3Cpath d='M12 25h40' stroke='%23d9dde3' stroke-width='4'/%3E%3Cpath d='M23 39l6 6 13-16' fill='none' stroke='%231769aa' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M22 10v10M42 10v10' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --ink: #20242a;
+      --muted: #6b7280;
+      --line: #8c9198;
+      --line-soft: #d9dde3;
+      --paper: #ffffff;
+      --surface: #f5f6f8;
+      --pink: #f2386d;
+      --blue: #2488d8;
+      --sunday: #f23850;
+      --sat-bg: #eaf4ff;
+      --sun-bg: #fff1f5;
+      --today: #fff7d6;
+      --active: #2f6fed;
+      --active-soft: #eaf2ff;
+      --waiting: #f5a524;
+      --waiting-soft: #fff5dd;
+      --not-started: #8a94a8;
+      --not-started-soft: #f1f3f7;
+      --done: #2fb36d;
+      --done-soft: #e8f8ef;
+      --month-col: 72px;
+      --project-col: 130px;
+      --task-col: 160px;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "YuGothic", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--surface);
+      font-size: 14px;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 16px;
+      align-items: end;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(245, 246, 248, 0.96);
+      backdrop-filter: blur(12px);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 190px 260px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .field span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field input {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 8px 10px;
+    }
+
+    .month-nav {
+      display: grid;
+      grid-template-columns: minmax(128px, 1fr) 34px auto 34px;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .month-nav input {
+      min-width: 0;
+    }
+
+    .view-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .view-tab {
+      border: 0;
+      border-right: 1px solid var(--line-soft);
+      background: #fff;
+      color: var(--muted);
+      padding: 0 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .view-tab:last-child {
+      border-right: 0;
+    }
+
+    .view-tab.is-active {
+      background: #1769aa;
+      color: #fff;
+    }
+
+    .nav-btn {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 0 9px;
+      cursor: pointer;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .nav-btn.compact {
+      width: 34px;
+      padding: 0;
+      font-size: 18px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: end;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .actions.is-hidden {
+      display: none;
+    }
+
+    .btn {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 8px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn.primary {
+      border-color: #1769aa;
+      background: #1769aa;
+      color: #fff;
+    }
+
+    .btn.warn {
+      border-color: #f0b8b2;
+      color: #b42318;
+    }
+
+    .workspace {
+      padding: 18px;
+    }
+
+    .sheet {
+      width: min(100%, 1500px);
+      margin: 0 auto;
+      background: var(--paper);
+      box-shadow: 0 18px 50px rgba(31, 41, 51, 0.12);
+    }
+
+    .sheet + .sheet {
+      margin-top: 18px;
+    }
+
+    .sheet-title {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sheet-title h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .sheet-title span {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .board-wrap {
+      overflow: auto;
+      padding: 0 12px 14px;
+    }
+
+    .report-panel {
+      display: grid;
+      gap: 12px;
+      margin: 0 12px 14px;
+      padding: 14px;
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .report-head {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .report-head h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.3;
+      letter-spacing: 0;
+    }
+
+    .report-head p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .report-controls {
+      display: flex;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .report-date-field {
+      width: 150px;
+    }
+
+    .report-text {
+      width: 100%;
+      min-height: 128px;
+      resize: vertical;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 10px 12px;
+      font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    .calendar-board {
+      display: grid;
+      grid-template-columns: var(--month-col) var(--project-col) var(--task-col) repeat(var(--days), minmax(30px, 1fr));
+      grid-template-rows: 112px repeat(var(--rows), 38px);
+      min-width: calc(var(--month-col) + var(--project-col) + var(--task-col) + var(--days) * 30px);
+      background: #fff;
+    }
+
+    .month-panel {
+      grid-column: 1;
+      grid-row: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 2px;
+      padding: 10px 10px;
+      border-left: 1px solid transparent;
+      border-top: 1px solid transparent;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      color: var(--pink);
+    }
+
+    .month-number {
+      font-size: 42px;
+      line-height: 0.9;
+      font-weight: 300;
+      letter-spacing: 0;
+    }
+
+    .month-name {
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .year-name {
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    .project-head,
+    .task-head {
+      grid-row: 1;
+      display: flex;
+      align-items: flex-end;
+      padding: 0 10px 12px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .project-head {
+      grid-column: 2;
+      border-left: 1px solid var(--line);
+      background: #faf7f0;
+    }
+
+    .task-head {
+      grid-column: 3;
+      background: #fff;
+    }
+
+    .date-head {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      justify-items: center;
+      align-items: start;
+      gap: 3px;
+      padding-top: 9px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      min-width: 0;
+      cursor: pointer;
+    }
+
+    .date-head:focus-visible {
+      outline: 3px solid rgba(23, 105, 170, 0.35);
+      outline-offset: -3px;
+      z-index: 2;
+    }
+
+    .date-head.sat,
+    .check-cell.sat {
+      background: var(--sat-bg);
+    }
+
+    .date-head.sun,
+    .check-cell.sun {
+      background: var(--sun-bg);
+    }
+
+    .date-head.today,
+    .check-cell.today {
+      background: var(--today);
+    }
+
+    .day-num {
+      font-size: 21px;
+      line-height: 1;
+      font-weight: 500;
+    }
+
+    .weekday {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .sat .day-num,
+    .sat .weekday {
+      color: var(--blue);
+    }
+
+    .sun .day-num,
+    .sun .weekday {
+      color: var(--sunday);
+    }
+
+    .project-cell,
+    .task-cell {
+      position: relative;
+      z-index: 6;
+      display: flex;
+      align-items: center;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .project-cell {
+      border-left: 1px solid var(--line);
+      background: #fffaf0;
+    }
+
+    .project-cell.group-even {
+      background: #f6fbff;
+    }
+
+    .task-cell {
+      background: #fff;
+    }
+
+    .task-cell.menu-open {
+      z-index: 30;
+    }
+
+    .project-cell.group-start,
+    .task-cell.group-start,
+    .check-cell.group-start {
+      box-shadow: none;
+    }
+
+    .project-input,
+    .task-input {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 0 30px 0 9px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .task-input {
+      padding-right: 40px;
+    }
+
+    .project-input {
+      color: #8a4b0f;
+    }
+
+    .group-even .project-input {
+      color: #175cd3;
+    }
+
+    .project-drag-handle {
+      position: absolute;
+      right: 4px;
+      top: 2px;
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background: transparent;
+      color: #6b7280;
+      cursor: grab;
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1;
+      opacity: 0.42;
+    }
+
+    .project-drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .project-cell:hover .project-drag-handle,
+    .project-drag-handle:focus-visible {
+      opacity: 1;
+      border-color: var(--line-soft);
+      background: #fff;
+    }
+
+    .project-cell.drag-target-before {
+      box-shadow: inset 0 2px 0 #1769aa;
+    }
+
+    .project-cell.drag-target-after {
+      box-shadow: inset 0 -2px 0 #1769aa;
+    }
+
+    .row-menu {
+      position: absolute;
+      right: 4px;
+      z-index: 12;
+      opacity: 0.32;
+    }
+
+    .row-menu summary {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.86);
+      color: #6b7280;
+      cursor: pointer;
+      font-weight: 900;
+      line-height: 1;
+      padding: 0;
+      list-style: none;
+    }
+
+    .row-menu summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .task-cell:hover .row-menu,
+    .row-menu:focus-within,
+    .row-menu[open] {
+      opacity: 1;
+    }
+
+    .row-menu summary:hover,
+    .row-menu summary:focus-visible {
+      border-color: #f0b8b2;
+      background: #fff;
+    }
+
+    .row-menu-popover {
+      position: absolute;
+      top: 24px;
+      right: 0;
+      z-index: 40;
+      display: grid;
+      width: 82px;
+      border: 1px solid var(--line-soft);
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(31, 41, 51, 0.16);
+      overflow: hidden;
+    }
+
+    .menu-action {
+      border: 0;
+      border-bottom: 1px solid var(--line-soft);
+      background: #fff;
+      color: var(--ink);
+      padding: 7px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .menu-action:last-child {
+      border-bottom: 0;
+    }
+
+    .menu-action:hover,
+    .menu-action:focus-visible {
+      background: #eef3f8;
+    }
+
+    .menu-action.remove-row {
+      color: #b42318;
+    }
+
+    .check-cell {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      border: 0;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      cursor: pointer;
+      color: #1769aa;
+    }
+
+    .check-cell::before {
+      content: "";
+      width: 17px;
+      height: 17px;
+      border: 1px dashed #c2c8d0;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .check-cell.is-checked::before {
+      border-style: solid;
+      border-color: #1769aa;
+      background: #e8f3ff;
+    }
+
+    .check-cell.is-checked::after {
+      content: "✓";
+      position: absolute;
+      font-size: 17px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .check-cell:focus-visible {
+      outline: 3px solid rgba(23, 105, 170, 0.35);
+      outline-offset: -3px;
+      z-index: 2;
+    }
+
+    .project-overview {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line-soft);
+      background: #fbfcfd;
+    }
+
+    .summary-card {
+      --summary-color: var(--active);
+      position: relative;
+      min-height: 72px;
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px 12px;
+      overflow: hidden;
+    }
+
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: var(--summary-color);
+    }
+
+    .summary-card.summary-active {
+      --summary-color: var(--active);
+      background: linear-gradient(90deg, var(--active-soft), #fff 46%);
+    }
+
+    .summary-card.summary-due {
+      --summary-color: var(--waiting);
+      background: linear-gradient(90deg, var(--waiting-soft), #fff 46%);
+    }
+
+    .summary-card.summary-waiting {
+      --summary-color: #ef8c00;
+      background: linear-gradient(90deg, var(--waiting-soft), #fff 46%);
+    }
+
+    .summary-card.summary-average {
+      --summary-color: var(--done);
+      background: linear-gradient(90deg, var(--done-soft), #fff 46%);
+    }
+
+    .summary-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .summary-card strong {
+      display: block;
+      margin-top: 6px;
+      color: var(--summary-color);
+      font-size: 22px;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .project-view-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line-soft);
+      background: #fff;
+    }
+
+    .project-view-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .project-view-tab {
+      min-height: 32px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: #fff;
+      color: var(--muted);
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .project-view-tab.is-active {
+      border-color: #1769aa;
+      background: linear-gradient(180deg, #fff, #eef6ff);
+      color: #175cd3;
+    }
+
+    .roadmap-wrap {
+      overflow: auto;
+      padding: 14px 16px 16px;
+    }
+
+    .project-board {
+      --roadmap-days: 31;
+      min-width: 0;
+    }
+
+    .project-board input,
+    .project-board select {
+      width: 100%;
+      min-width: 0;
+      height: 30px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--ink);
+      padding: 4px 6px;
+      font-weight: 700;
+    }
+
+    .project-board input:focus,
+    .project-board select:focus {
+      outline: 2px solid rgba(23, 105, 170, 0.25);
+      border-color: #8bbbe5;
+      background: #fff;
+    }
+
+    .project-name-input {
+      font-size: 14px;
+    }
+
+    .project-name-stack {
+      display: grid;
+      gap: 5px;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .gantt-task-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .gantt-task-chip {
+      max-width: 100%;
+      border: 1px solid #d6e4ff;
+      border-radius: 999px;
+      background: #eef5ff;
+      color: #175cd3;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .project-board .number-input {
+      text-align: right;
+    }
+
+    .progress-field {
+      width: 100%;
+    }
+
+    .project-board .progress-input {
+      height: 32px;
+      border-color: var(--line-soft);
+      background: #fff;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .status-pill,
+    .status-select,
+    .priority-pill,
+    .priority-select {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .status-select.status-not-started,
+    .status-pill.status-not-started {
+      border-color: #d7dbe4;
+      color: #475467;
+      background: var(--not-started-soft);
+    }
+
+    .status-select.status-active,
+    .status-pill.status-active {
+      border-color: #c7dcff;
+      color: #175cd3;
+      background: var(--active-soft);
+    }
+
+    .status-select.status-waiting,
+    .status-pill.status-waiting {
+      border-color: #ffd990;
+      color: #b54708;
+      background: var(--waiting-soft);
+    }
+
+    .status-select.status-done,
+    .status-pill.status-done {
+      border-color: #bfeccd;
+      color: #067647;
+      background: var(--done-soft);
+    }
+
+    .priority-select.priority-high {
+      color: #b42318;
+      background: #fff1f3;
+      border-color: #ffd2dc;
+    }
+
+    .priority-select.priority-medium {
+      color: #b54708;
+      background: var(--waiting-soft);
+      border-color: #ffe0a3;
+    }
+
+    .priority-select.priority-low {
+      color: #475467;
+      background: var(--not-started-soft);
+      border-color: #d7dbe4;
+    }
+
+    .priority-pill {
+      display: inline-grid;
+      place-items: center;
+      min-width: 30px;
+      min-height: 22px;
+      background: #f7f8fa;
+      color: var(--muted);
+    }
+
+    .delete-project {
+      width: 26px;
+      height: 26px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: #98a2b3;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .delete-project:hover,
+    .delete-project:focus-visible {
+      background: #fff1f3;
+      color: #b42318;
+    }
+
+    .project-empty {
+      padding: 28px;
+      border: 1px dashed var(--line-soft);
+      border-radius: 8px;
+      color: var(--muted);
+      font-weight: 800;
+      text-align: center;
+      background: #fbfcfd;
+    }
+
+    .timeline-head,
+    .timeline-track {
+      display: grid;
+      grid-template-columns: repeat(var(--roadmap-days), minmax(18px, 1fr));
+      width: 100%;
+      min-width: calc(var(--roadmap-days) * 18px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .timeline-head {
+      height: 40px;
+    }
+
+    .timeline-head span {
+      display: grid;
+      place-items: center;
+      border-right: 1px solid var(--line-soft);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .timeline-head .sat,
+    .timeline-track .sat {
+      background: var(--sat-bg);
+    }
+
+    .timeline-head .sun,
+    .timeline-track .sun {
+      background: var(--sun-bg);
+    }
+
+    .timeline-head .today,
+    .timeline-track .today {
+      background: var(--today);
+    }
+
+    .timeline-day {
+      grid-row: 1;
+      border-right: 1px solid var(--line-soft);
+    }
+
+    .timeline-track.is-mini {
+      grid-template-columns: repeat(var(--roadmap-days), minmax(5px, 1fr));
+      min-width: 0;
+      height: 44px;
+    }
+
+    .timeline-track.is-mini .roadmap-bar {
+      height: 14px;
+    }
+
+    .timeline-track.is-mini .roadmap-bar-label {
+      font-size: 0;
+      text-shadow: none;
+    }
+
+    .timeline-track.is-mini .roadmap-due-dot,
+    .timeline-track.is-mini .roadmap-due-label {
+      display: none;
+    }
+
+    .roadmap-bar {
+      --bar-fill: linear-gradient(90deg, #3b82f6, #73a7ff);
+      --bar-soft: #d9e8ff;
+      --bar-border: rgba(47, 111, 237, 0.22);
+      grid-row: 1;
+      align-self: center;
+      position: relative;
+      z-index: 1;
+      min-width: 22px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--bar-fill);
+      box-shadow: inset 0 0 0 1px var(--bar-border), 0 6px 14px rgba(32, 36, 42, 0.08);
+      overflow: hidden;
+    }
+
+    .roadmap-bar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+      pointer-events: none;
+    }
+
+    .roadmap-bar.status-active {
+      --bar-fill: linear-gradient(90deg, #2f6fed, #73a7ff);
+      --bar-soft: #dceaff;
+      --bar-border: rgba(47, 111, 237, 0.24);
+    }
+
+    .roadmap-bar.status-done {
+      --bar-fill: linear-gradient(90deg, #26a65b, #5ad98b);
+      --bar-soft: #d9f5e4;
+      --bar-border: rgba(47, 179, 109, 0.28);
+    }
+
+    .roadmap-bar.status-waiting {
+      --bar-fill: linear-gradient(90deg, #f5a524, #ffd166);
+      --bar-soft: #fff0c8;
+      --bar-border: rgba(245, 165, 36, 0.3);
+    }
+
+    .roadmap-bar.status-not-started {
+      --bar-fill: linear-gradient(90deg, #8a94a8, #b8c0cf);
+      --bar-soft: #edf0f5;
+      --bar-border: rgba(138, 148, 168, 0.34);
+    }
+
+    .roadmap-bar-label {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 900;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+    }
+
+    .roadmap-due-dot {
+      --dot-color: var(--active);
+      grid-row: 1;
+      align-self: center;
+      justify-self: end;
+      position: relative;
+      z-index: 2;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--dot-color);
+      box-shadow: 0 0 0 2px #fff;
+    }
+
+    .roadmap-due-dot.status-active {
+      --dot-color: var(--active);
+    }
+
+    .roadmap-due-dot.status-waiting {
+      --dot-color: var(--waiting);
+    }
+
+    .roadmap-due-dot.status-not-started {
+      --dot-color: var(--not-started);
+    }
+
+    .roadmap-due-dot.status-done {
+      --dot-color: var(--done);
+    }
+
+    .roadmap-due-label {
+      grid-row: 1;
+      align-self: center;
+      justify-self: start;
+      position: relative;
+      z-index: 2;
+      margin-left: 6px;
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .roadmap-placeholder {
+      grid-column: 1 / -1;
+      align-self: center;
+      justify-self: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .project-board.is-roadmap {
+      display: grid;
+      grid-template-columns: 24px minmax(150px, 1fr) 92px 72px 96px 96px 70px minmax(150px, 1fr) minmax(calc(var(--roadmap-days) * 20px), 1.6fr);
+      grid-auto-rows: minmax(72px, auto);
+      min-width: calc(760px + var(--roadmap-days) * 20px);
+      border-left: 1px solid var(--line-soft);
+      border-top: 1px solid var(--line-soft);
+      background: #fff;
+    }
+
+    .roadmap-head-cell,
+    .roadmap-timeline-head,
+    .roadmap-field-cell,
+    .roadmap-timeline-cell {
+      min-width: 0;
+      border-right: 1px solid var(--line-soft);
+      border-bottom: 1px solid var(--line-soft);
+      background: #fff;
+    }
+
+    .roadmap-head-cell {
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      background: #f7f8fa;
+    }
+
+    .roadmap-timeline-head {
+      background: #f7f8fa;
+    }
+
+    .roadmap-field-cell {
+      display: flex;
+      align-items: center;
+      padding: 8px 9px;
+    }
+
+    .roadmap-name-cell.status-active {
+      box-shadow: inset 4px 0 0 var(--active);
+    }
+
+    .roadmap-name-cell.status-waiting {
+      box-shadow: inset 4px 0 0 var(--waiting);
+    }
+
+    .roadmap-name-cell.status-not-started {
+      box-shadow: inset 4px 0 0 var(--not-started);
+    }
+
+    .roadmap-name-cell.status-done {
+      box-shadow: inset 4px 0 0 var(--done);
+    }
+
+    .roadmap-handle {
+      justify-content: center;
+      color: #98a2b3;
+      font-weight: 900;
+      cursor: grab;
+      padding: 0;
+    }
+
+    .roadmap-handle-mark {
+      transform: rotate(90deg);
+      font-size: 14px;
+      line-height: 1;
+      opacity: 0.7;
+    }
+
+    .roadmap-timeline-cell {
+      padding: 0;
+    }
+
+    .roadmap-timeline-cell .timeline-track {
+      height: 100%;
+      min-height: 72px;
+    }
+
+    .project-board.is-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .project-card {
+      --card-accent: var(--active);
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fff, #fbfdff);
+      padding: 12px;
+      box-shadow: inset 4px 0 0 var(--card-accent);
+    }
+
+    .project-card.status-active {
+      --card-accent: var(--active);
+    }
+
+    .project-card.status-waiting {
+      --card-accent: var(--waiting);
+    }
+
+    .project-card.status-not-started {
+      --card-accent: var(--not-started);
+    }
+
+    .project-card.status-done {
+      --card-accent: var(--done);
+    }
+
+    .project-card-head {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) 26px;
+      gap: 8px;
+      align-items: start;
+    }
+
+    .project-card .gantt-task-chips {
+      margin-top: -2px;
+    }
+
+    .project-card-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .project-field {
+      display: grid;
+      gap: 3px;
+    }
+
+    .project-field span {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .project-card-progress {
+      display: grid;
+      gap: 5px;
+    }
+
+    .mini-progress {
+      --mini-fill: #2f6fed;
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #eef2f6;
+    }
+
+    .mini-progress span {
+      display: block;
+      width: var(--progress);
+      height: 100%;
+      background: var(--mini-fill);
+    }
+
+    .mini-progress.status-active {
+      --mini-fill: var(--active);
+    }
+
+    .mini-progress.status-waiting {
+      --mini-fill: var(--waiting);
+    }
+
+    .mini-progress.status-not-started {
+      --mini-fill: var(--not-started);
+    }
+
+    .mini-progress.status-done {
+      --mini-fill: var(--done);
+    }
+
+    .project-board.is-list {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.1fr) 86px 64px 96px 96px 70px minmax(220px, 1.4fr) minmax(140px, 1fr) 34px;
+      min-width: 1050px;
+      border-left: 1px solid var(--line-soft);
+      border-top: 1px solid var(--line-soft);
+      background: #fff;
+    }
+
+    .list-head,
+    .list-cell {
+      min-width: 0;
+      border-right: 1px solid var(--line-soft);
+      border-bottom: 1px solid var(--line-soft);
+      background: #fff;
+    }
+
+    .list-head {
+      display: flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 0 9px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      background: #f7f8fa;
+    }
+
+    .list-cell {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 5px 7px;
+    }
+
+    .list-name-cell.status-active {
+      box-shadow: inset 4px 0 0 var(--active);
+    }
+
+    .list-name-cell.status-waiting {
+      box-shadow: inset 4px 0 0 var(--waiting);
+    }
+
+    .list-name-cell.status-not-started {
+      box-shadow: inset 4px 0 0 var(--not-started);
+    }
+
+    .list-name-cell.status-done {
+      box-shadow: inset 4px 0 0 var(--done);
+    }
+
+    .timeline-list-cell {
+      padding: 0;
+    }
+
+    @media (max-width: 860px) {
+      .toolbar,
+      .controls {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar-actions,
+      .actions {
+        justify-content: flex-start;
+      }
+
+      .actions {
+        justify-content: flex-start;
+      }
+
+      .workspace {
+        padding: 14px;
+      }
+
+      .sheet-title {
+        grid-template-columns: 1fr;
+      }
+
+      .report-head,
+      .report-controls {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+
+      .report-controls {
+        display: grid;
+      }
+
+      .report-date-field {
+        width: 100%;
+      }
+
+      .project-overview {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 8mm;
+      }
+
+      body {
+        background: #fff;
+        font-size: 10px;
+      }
+
+      .toolbar {
+        display: none;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .workspace {
+        padding: 0;
+      }
+
+      .sheet {
+        width: 100%;
+        box-shadow: none;
+      }
+
+      .sheet-title {
+        padding: 0 0 5mm;
+      }
+
+      .sheet-title h1 {
+        font-size: 15px;
+      }
+
+      .sheet-title span {
+        font-size: 8px;
+      }
+
+      .board-wrap {
+        overflow: visible;
+        padding: 0;
+      }
+
+      .report-panel {
+        margin: 5mm 0 0;
+        padding: 3mm;
+        break-inside: avoid;
+      }
+
+      .report-head h2 {
+        font-size: 10px;
+      }
+
+      .report-head p,
+      .report-date-field,
+      #copyReport {
+        display: none;
+      }
+
+      .report-text {
+        min-height: 32mm;
+        border: 0;
+        padding: 0;
+        font-size: 8px;
+      }
+
+      .project-overview {
+        grid-template-columns: repeat(4, 1fr);
+        padding: 3mm 0;
+      }
+
+      .roadmap-wrap {
+        overflow: visible;
+        padding: 0;
+      }
+
+      .project-board.is-roadmap {
+        min-width: 0;
+        grid-template-columns: 6mm 31mm 18mm 13mm 20mm 20mm 14mm 34mm minmax(94mm, 1fr);
+        grid-auto-rows: 9.8mm;
+      }
+
+      .roadmap-head-cell,
+      .roadmap-timeline-head,
+      .roadmap-field-cell {
+        font-size: 7px;
+        padding: 0 1.5mm;
+      }
+
+      .roadmap-field-cell input,
+      .roadmap-field-cell select {
+        border: 0;
+        height: auto;
+        padding: 0;
+        font-size: 7px;
+      }
+
+      .project-board.is-roadmap .timeline-head,
+      .project-board.is-roadmap .timeline-track {
+        grid-template-columns: repeat(var(--roadmap-days), minmax(0, 1fr));
+        min-width: 0;
+      }
+
+      .project-board.is-roadmap .timeline-head {
+        height: 9.8mm;
+      }
+
+      .project-board.is-roadmap .roadmap-bar {
+        height: 4mm;
+      }
+
+      .project-board.is-roadmap .roadmap-due-dot,
+      .project-board.is-roadmap .roadmap-due-label {
+        display: none;
+      }
+
+      .delete-project {
+        display: none;
+      }
+
+      .calendar-board {
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: 20mm 28mm 35mm repeat(var(--days), minmax(0, 1fr));
+        grid-template-rows: 31mm repeat(var(--rows), 9.2mm);
+      }
+
+      .month-panel {
+        padding: 2mm;
+      }
+
+      .month-number {
+        font-size: 28px;
+      }
+
+      .month-name {
+        font-size: 8px;
+      }
+
+      .year-name,
+      .task-head,
+      .weekday {
+        font-size: 6.5px;
+      }
+
+      .day-num {
+        font-size: 12px;
+      }
+
+      .date-head {
+        gap: 1.5mm;
+        padding-top: 2mm;
+      }
+
+      .project-input,
+      .task-input {
+        padding: 0 2mm;
+        font-size: 8px;
+      }
+
+      .row-menu {
+        display: none;
+      }
+
+      .check-cell,
+      .date-head,
+      .project-cell,
+      .task-cell,
+      .month-panel,
+      .project-head,
+      .task-head {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+
+      .month-panel,
+      .project-head,
+      .task-head,
+      .project-cell,
+      .task-cell {
+        position: static;
+        box-shadow: none;
+      }
+
+      .check-cell::before {
+        width: 4.8mm;
+        height: 4.8mm;
+      }
+
+      .check-cell.is-checked::after {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <div class="controls">
+      <label class="field">
+        <span>表示</span>
+        <span class="view-tabs" aria-label="表示切り替え">
+          <button class="view-tab is-active" id="showGantt" type="button" aria-pressed="true">ガント</button>
+          <button class="view-tab" id="showProjects" type="button" aria-pressed="false">プロジェクト</button>
+        </span>
+      </label>
+      <label class="field">
+        <span>月</span>
+        <span class="month-nav">
+          <input id="monthInput" type="month">
+          <button class="nav-btn compact" id="prevMonth" type="button" title="前月" aria-label="前月">‹</button>
+          <button class="nav-btn" id="currentMonth" type="button">今月</button>
+          <button class="nav-btn compact" id="nextMonth" type="button" title="来月" aria-label="来月">›</button>
+        </span>
+      </label>
+    </div>
+    <div class="toolbar-actions">
+      <div class="actions" id="ganttActions">
+        <button class="btn" id="addRow" type="button">行を追加</button>
+        <button class="btn" id="copyPreviousMonth" type="button">前月からコピー</button>
+        <button class="btn" id="removeBlankRows" type="button">空行を整理</button>
+        <button class="btn warn" id="clearMonth" type="button">今月分をクリア</button>
+        <button class="btn" id="printButton" type="button">印刷</button>
+      </div>
+      <div class="actions is-hidden" id="projectActions">
+        <button class="btn" id="addProject" type="button">プロジェクト追加</button>
+        <button class="btn" id="importProjects" type="button">ガントを反映</button>
+        <button class="btn" id="printProjects" type="button">印刷</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="sheet" id="ganttPanel" aria-label="ガントチャート">
+      <div class="sheet-title">
+        <h1 id="sheetTitle">ガントチャート</h1>
+        <span id="sheetMeta"></span>
+      </div>
+      <div class="board-wrap">
+        <div class="calendar-board" id="calendarBoard"></div>
+      </div>
+      <section class="report-panel" aria-label="日報用リスト">
+        <div class="report-head">
+          <div>
+            <h2>日報用リスト</h2>
+            <p id="reportDateLabel"></p>
+          </div>
+          <div class="report-controls">
+            <label class="field report-date-field">
+              <span>日付</span>
+              <input id="reportDateInput" type="date">
+            </label>
+            <button class="btn" id="copyReport" type="button">コピー</button>
+          </div>
+        </div>
+        <textarea class="report-text" id="reportText" readonly aria-label="日報用の箇条書き"></textarea>
+      </section>
+    </section>
+    <section class="sheet" id="projectPanel" aria-label="プロジェクト管理" hidden>
+      <div class="sheet-title">
+        <h1>プロジェクト管理</h1>
+        <span id="projectMeta"></span>
+      </div>
+      <div class="project-overview" id="projectOverview"></div>
+      <div class="project-view-bar" id="projectViewBar" aria-label="プロジェクト管理の表示切り替え"></div>
+      <div class="roadmap-wrap">
+        <div class="project-roadmap" id="projectRoadmap"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "personalMonthlyTaskChecks";
+    const monthInput = document.getElementById("monthInput");
+    const board = document.getElementById("calendarBoard");
+    const sheetTitle = document.getElementById("sheetTitle");
+    const sheetMeta = document.getElementById("sheetMeta");
+    const ganttPanel = document.getElementById("ganttPanel");
+    const projectPanel = document.getElementById("projectPanel");
+    const ganttActions = document.getElementById("ganttActions");
+    const projectActions = document.getElementById("projectActions");
+    const showGanttButton = document.getElementById("showGantt");
+    const showProjectsButton = document.getElementById("showProjects");
+    const projectMeta = document.getElementById("projectMeta");
+    const projectOverview = document.getElementById("projectOverview");
+    const projectViewBar = document.getElementById("projectViewBar");
+    const projectRoadmap = document.getElementById("projectRoadmap");
+    const reportDateInput = document.getElementById("reportDateInput");
+    const reportDateLabel = document.getElementById("reportDateLabel");
+    const reportText = document.getElementById("reportText");
+    const copyReportButton = document.getElementById("copyReport");
+    const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const DEFAULT_TITLE = "ガントチャート";
+    const OLD_DEFAULT_TITLE = "月間タスクチェック表";
+    const projectStatuses = [
+      { value: "not-started", label: "未着手" },
+      { value: "active", label: "進行中" },
+      { value: "waiting", label: "確認待ち" },
+      { value: "done", label: "完了" }
+    ];
+    const projectPriorities = ["高", "中", "低"];
+    const projectViews = [
+      { value: "roadmap", label: "ロードマップ" },
+      { value: "cards", label: "カード" }
+    ];
+
+    let state = loadState();
+    let draggingProjectStart = null;
+    const history = {
+      undo: [],
+      redo: [],
+      limit: 80
+    };
+
+    function cloneState(value = state) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function rememberState() {
+      history.undo.push(cloneState());
+      if (history.undo.length > history.limit) history.undo.shift();
+      history.redo = [];
+    }
+
+    function applySnapshot(snapshot) {
+      state = cloneState(snapshot);
+      monthInput.value = state.month || currentMonthValue();
+      reportDateInput.value = state.reportDate || formatDate(new Date());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      render();
+    }
+
+    function undoState() {
+      if (!history.undo.length) return;
+      history.redo.push(cloneState());
+      applySnapshot(history.undo.pop());
+    }
+
+    function redoState() {
+      if (!history.redo.length) return;
+      history.undo.push(cloneState());
+      applySnapshot(history.redo.pop());
+    }
+
+    function isEditingText(event) {
+      const target = event.target;
+      return target && target.closest && target.closest("input, textarea, [contenteditable='true']");
+    }
+
+    function makeId() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return `task-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function makeTask(project = "", name = "") {
+      return { id: makeId(), project, name, checks: {} };
+    }
+
+    function makeProjectItem(name = "", options = {}) {
+      return {
+        id: makeId(),
+        name,
+        status: options.status || "active",
+        priority: options.priority || "中",
+        startDate: options.startDate || "",
+        dueDate: options.dueDate || "",
+        progress: options.progress ?? 0,
+        nextAction: options.nextAction || ""
+      };
+    }
+
+    function blankTasks(count = 12) {
+      return Array.from({ length: count }, () => makeTask("", ""));
+    }
+
+    function defaultTasks() {
+      return [
+        makeTask("サイト制作", "ワイヤーフレーム"),
+        makeTask("サイト制作", "デザイン"),
+        makeTask("サイト制作", "コーディング"),
+        makeTask("SNS運用", "投稿案作成"),
+        makeTask("SNS運用", "画像作成"),
+        makeTask("", ""),
+        makeTask("", ""),
+        makeTask("", ""),
+        makeTask("", ""),
+        makeTask("", ""),
+        makeTask("", ""),
+        makeTask("", "")
+      ];
+    }
+
+    function endOfMonthKey(monthKey) {
+      const month = parseMonth(monthKey);
+      return formatDate(new Date(month.getFullYear(), month.getMonth() + 1, 0));
+    }
+
+    function defaultProjectItems(monthKey = currentMonthValue()) {
+      const monthStart = `${monthKey}-01`;
+      const monthEnd = endOfMonthKey(monthKey);
+      const selectedMonth = parseMonth(monthKey);
+      const midMonth = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 18));
+
+      return [
+        makeProjectItem("生成AIポータル", {
+          status: "active",
+          priority: "高",
+          startDate: monthStart,
+          dueDate: monthEnd,
+          progress: 45,
+          nextAction: "確認・整理"
+        }),
+        makeProjectItem("AI Lab RN", {
+          status: "waiting",
+          priority: "中",
+          startDate: formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 8)),
+          dueDate: monthEnd,
+          progress: 65,
+          nextAction: "仕様確認"
+        }),
+        makeProjectItem("次世代メディア", {
+          status: "active",
+          priority: "高",
+          startDate: midMonth,
+          dueDate: shiftDateKey(monthEnd, 7),
+          progress: 25,
+          nextAction: "記事整理"
+        }),
+        makeProjectItem("生成AI検証", {
+          status: "not-started",
+          priority: "低",
+          startDate: shiftDateKey(monthStart, 21),
+          dueDate: shiftDateKey(monthEnd, 14),
+          progress: 0,
+          nextAction: "検証項目整理"
+        })
+      ];
+    }
+
+    function projectItemsFromTasks(tasks, monthKey) {
+      const monthStart = `${monthKey}-01`;
+      const monthEnd = endOfMonthKey(monthKey);
+      const names = new Map();
+      let inheritedProject = "";
+
+      tasks.forEach(task => {
+        const explicit = (task.project || "").trim();
+        if (explicit) inheritedProject = explicit;
+        const name = inheritedProject;
+        const taskName = (task.name || "").trim();
+        if (!name) return;
+        if (!names.has(name)) {
+          names.set(name, makeProjectItem(name, {
+            status: "active",
+            priority: "中",
+            startDate: monthStart,
+            dueDate: monthEnd,
+            progress: 0,
+            nextAction: taskName
+          }));
+        } else if (!names.get(name).nextAction && taskName) {
+          names.get(name).nextAction = taskName;
+        }
+      });
+
+      return Array.from(names.values());
+    }
+
+    function normalizeTask(task) {
+      if (!task.id) task.id = makeId();
+      if (typeof task.project !== "string") task.project = "";
+      if (typeof task.name !== "string") task.name = "";
+      if (!task.checks) task.checks = {};
+      return task;
+    }
+
+    function normalizeProjectItem(item) {
+      if (!item.id) item.id = makeId();
+      if (typeof item.name !== "string") item.name = "";
+      if (!projectStatuses.some(status => status.value === item.status)) item.status = "active";
+      if (!projectPriorities.includes(item.priority)) item.priority = "中";
+      if (typeof item.startDate !== "string") item.startDate = "";
+      if (typeof item.dueDate !== "string") item.dueDate = "";
+      item.progress = Math.max(0, Math.min(100, Number(item.progress) || 0));
+      if (typeof item.nextAction !== "string") item.nextAction = "";
+      return item;
+    }
+
+    function normalizeMonthRecord(record) {
+      const monthRecord = record && Array.isArray(record.tasks) ? record : { tasks: blankTasks() };
+      monthRecord.tasks.forEach(normalizeTask);
+      if (!monthRecord.tasks.length) monthRecord.tasks = blankTasks();
+      return monthRecord;
+    }
+
+    function selectedMonthKey() {
+      return monthInput.value || state.month || currentMonthValue();
+    }
+
+    function ensureMonth(monthKey = selectedMonthKey()) {
+      if (!state.months) state.months = {};
+      if (!state.months[monthKey]) state.months[monthKey] = { tasks: blankTasks() };
+      state.months[monthKey] = normalizeMonthRecord(state.months[monthKey]);
+      return state.months[monthKey];
+    }
+
+    function currentTasks() {
+      return ensureMonth().tasks;
+    }
+
+    function ensureProjectItems() {
+      if (!Array.isArray(state.projectItems)) state.projectItems = [];
+      state.projectItems.forEach(normalizeProjectItem);
+      return state.projectItems;
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved && saved.months && typeof saved.months === "object") {
+          Object.keys(saved.months).forEach(monthKey => {
+            saved.months[monthKey] = normalizeMonthRecord(saved.months[monthKey]);
+          });
+          if (typeof saved.reportDate !== "string") saved.reportDate = "";
+          if (!saved.title || saved.title === OLD_DEFAULT_TITLE) saved.title = DEFAULT_TITLE;
+          if (!Array.isArray(saved.projectItems)) {
+            const monthKey = saved.month || currentMonthValue();
+            const monthRecord = saved.months[monthKey] || Object.values(saved.months)[0];
+            saved.projectItems = monthRecord && Array.isArray(monthRecord.tasks)
+              ? projectItemsFromTasks(monthRecord.tasks, monthKey)
+              : defaultProjectItems(monthKey);
+          }
+          saved.projectItems.forEach(normalizeProjectItem);
+          if (saved.activeView !== "projects") saved.activeView = "gantt";
+          if (!projectViews.some(view => view.value === saved.projectView)) saved.projectView = "roadmap";
+          return saved;
+        }
+        if (saved && Array.isArray(saved.tasks)) {
+          const monthKey = saved.month || currentMonthValue();
+          saved.tasks.forEach(normalizeTask);
+          if (typeof saved.reportDate !== "string") saved.reportDate = "";
+          return {
+            title: saved.title && saved.title !== OLD_DEFAULT_TITLE ? saved.title : DEFAULT_TITLE,
+            month: monthKey,
+            reportDate: saved.reportDate,
+            activeView: "gantt",
+            projectView: "roadmap",
+            projectItems: projectItemsFromTasks(saved.tasks, monthKey),
+            months: {
+              [monthKey]: { tasks: saved.tasks }
+            }
+          };
+        }
+      } catch (error) {
+        console.warn("Failed to read saved checklist", error);
+      }
+      const monthKey = currentMonthValue();
+      return {
+        title: DEFAULT_TITLE,
+        month: monthKey,
+        reportDate: "",
+        activeView: "gantt",
+        projectView: "roadmap",
+        projectItems: defaultProjectItems(monthKey),
+        months: {
+          [monthKey]: { tasks: defaultTasks() }
+        }
+      };
+    }
+
+    function saveState() {
+      state.title = DEFAULT_TITLE;
+      state.month = monthInput.value;
+      state.reportDate = reportDateInput.value;
+      ensureMonth(state.month || currentMonthValue());
+      ensureProjectItems();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function pad(number) {
+      return String(number).padStart(2, "0");
+    }
+
+    function formatDate(date) {
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function shiftDateKey(dateKey, amount) {
+      const date = new Date(`${dateKey}T00:00:00`);
+      date.setDate(date.getDate() + amount);
+      return formatDate(date);
+    }
+
+    function normalizeDateKey(value) {
+      if (!value) return "";
+      const parts = String(value).split(/[-/]/).map(Number);
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return String(value);
+      return `${parts[0]}-${pad(parts[1])}-${pad(parts[2])}`;
+    }
+
+    function isCheckedOnDate(task, dateKey) {
+      const normalized = normalizeDateKey(dateKey);
+      return Object.keys(task.checks || {}).some(key => normalizeDateKey(key) === normalized && task.checks[key]);
+    }
+
+    function parseMonth(value) {
+      const [year, month] = value.split("-").map(Number);
+      return new Date(year, month - 1, 1);
+    }
+
+    function addDays(date, days) {
+      const copy = new Date(date);
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    }
+
+    function daysInMonth(date) {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    }
+
+    function currentMonthValue() {
+      const today = new Date();
+      return `${today.getFullYear()}-${pad(today.getMonth() + 1)}`;
+    }
+
+    function preferredReportDate(monthKey) {
+      return monthKey === currentMonthValue() ? formatDate(new Date()) : `${monthKey}-01`;
+    }
+
+    function previousMonthKey(monthKey) {
+      const month = parseMonth(monthKey);
+      month.setMonth(month.getMonth() - 1);
+      return `${month.getFullYear()}-${pad(month.getMonth() + 1)}`;
+    }
+
+    function shiftMonthKey(monthKey, amount) {
+      const month = parseMonth(monthKey);
+      month.setMonth(month.getMonth() + amount);
+      return `${month.getFullYear()}-${pad(month.getMonth() + 1)}`;
+    }
+
+    function changeMonth(monthKey) {
+      monthInput.value = monthKey;
+      reportDateInput.value = preferredReportDate(monthKey);
+      saveState();
+      render();
+    }
+
+    function classForDate(date) {
+      const day = date.getDay();
+      const classes = [];
+      if (day === 0) classes.push("sun");
+      if (day === 6) classes.push("sat");
+      if (formatDate(date) === formatDate(new Date())) classes.push("today");
+      return classes.join(" ");
+    }
+
+    function formatReportDate(value) {
+      const date = value ? new Date(`${value}T00:00:00`) : new Date();
+      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日(${weekdays[date.getDay()]})`;
+    }
+
+    function projectKey(task) {
+      return task.project.trim();
+    }
+
+    function effectiveProjectKey(taskIndex) {
+      const tasks = currentTasks();
+      for (let index = taskIndex; index >= 0; index -= 1) {
+        const key = projectKey(tasks[index]);
+        if (key) return key;
+      }
+      return "";
+    }
+
+    function projectGroupIndex(taskIndex) {
+      let index = -1;
+      let previous = null;
+      for (let currentIndex = 0; currentIndex <= taskIndex; currentIndex += 1) {
+        const current = effectiveProjectKey(currentIndex);
+        if (current && current !== previous) index += 1;
+        previous = current || null;
+      }
+      return Math.max(index, 0);
+    }
+
+    function isGroupStart(taskIndex) {
+      if (taskIndex === 0) return true;
+      const current = effectiveProjectKey(taskIndex);
+      const previous = effectiveProjectKey(taskIndex - 1);
+      return current !== previous;
+    }
+
+    function projectGroups() {
+      const tasks = currentTasks();
+      const groups = [];
+      let start = 0;
+      let previous = null;
+
+      for (let index = 0; index < tasks.length; index += 1) {
+        const current = effectiveProjectKey(index);
+        if (current !== previous) {
+          if (previous) groups.push({ key: previous, start, end: index });
+          start = index;
+          previous = current;
+        }
+      }
+
+      if (previous) groups.push({ key: previous, start, end: tasks.length });
+      return groups;
+    }
+
+    function groupForRow(taskIndex) {
+      return projectGroups().find(group => taskIndex >= group.start && taskIndex < group.end);
+    }
+
+    function moveProjectGroup(sourceStart, targetIndex, placement) {
+      const tasks = currentTasks();
+      const groups = projectGroups();
+      const source = groups.find(group => group.start === sourceStart);
+      const target = groupForRow(targetIndex);
+      if (!source || !target || source.start === target.start) return;
+
+      rememberState();
+      const sourceLength = source.end - source.start;
+      const segment = tasks.splice(source.start, sourceLength);
+      let insertIndex = placement === "after" ? target.end : target.start;
+
+      if (source.start < insertIndex) insertIndex -= sourceLength;
+      tasks.splice(insertIndex, 0, ...segment);
+      saveState();
+      render();
+    }
+
+    function clearDragTargets() {
+      document.querySelectorAll(".project-cell.drag-target-before, .project-cell.drag-target-after").forEach(cell => {
+        cell.classList.remove("drag-target-before", "drag-target-after");
+      });
+    }
+
+    function checkedItemsForDate(dateKey) {
+      return currentTasks()
+        .map((task, index) => {
+          const project = effectiveProjectKey(index);
+          const explicitProject = projectKey(task);
+          const taskName = task.name.trim();
+
+          return {
+            project,
+            explicitProject,
+            task: taskName,
+            checked: isCheckedOnDate(task, dateKey)
+          };
+        })
+        .filter(item => item.checked && (item.project || item.task || item.explicitProject));
+    }
+
+    function isMeetingLabel(value) {
+      return value.trim() === "定例・MTG";
+    }
+
+    function formatReportItem(value) {
+      return isMeetingLabel(value) ? `${value} 件` : value;
+    }
+
+    function renderReport() {
+      const dateKey = reportDateInput.value || formatDate(new Date());
+      const items = checkedItemsForDate(dateKey);
+      const label = formatReportDate(dateKey);
+      const lines = [];
+
+      reportDateLabel.textContent = `${label} にチェックしたタスク`;
+
+      if (!items.length) {
+        lines.push("• （チェックしたタスクはありません）");
+      } else {
+        let previousProject = null;
+        items.forEach(item => {
+          const project = item.project || item.explicitProject;
+          if (project) {
+            if (project !== previousProject) {
+              lines.push(`• ${formatReportItem(project)}`);
+              previousProject = project;
+            }
+            if (item.task) lines.push(`  ◦ ${formatReportItem(item.task)}`);
+          } else {
+            lines.push(`• ${formatReportItem(item.task)}`);
+            previousProject = null;
+          }
+        });
+      }
+
+      reportText.value = lines.join("\n");
+    }
+
+    function insertRow(taskIndex, placement) {
+      rememberState();
+      const tasks = currentTasks();
+      const insertIndex = placement === "above" ? taskIndex : taskIndex + 1;
+      const sourceTask = tasks[taskIndex];
+      const task = makeTask("", "");
+
+      if (placement === "above" && projectKey(sourceTask)) {
+        task.project = sourceTask.project;
+        sourceTask.project = "";
+      }
+
+      tasks.splice(insertIndex, 0, task);
+      saveState();
+      render();
+    }
+
+    function statusClass(value) {
+      return `status-${value || "active"}`;
+    }
+
+    function statusForProgress(progress) {
+      if (progress >= 100) return "done";
+      if (progress > 0) return "active";
+      return "not-started";
+    }
+
+    function timelinePosition(project, monthKey) {
+      if (!project.startDate || !project.dueDate) return null;
+      const monthStart = new Date(`${monthKey}-01T00:00:00`);
+      const monthEnd = new Date(`${endOfMonthKey(monthKey)}T00:00:00`);
+      let start = new Date(`${project.startDate}T00:00:00`);
+      let due = new Date(`${project.dueDate}T00:00:00`);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(due.getTime())) return null;
+      if (due < start) [start, due] = [due, start];
+      if (due < monthStart || start > monthEnd) return null;
+
+      const visibleStart = start < monthStart ? monthStart : start;
+      const visibleEnd = due > monthEnd ? monthEnd : due;
+      const startDay = visibleStart.getDate();
+      const span = visibleEnd.getDate() - startDay + 1;
+      return { startDay, span };
+    }
+
+    function checkedProgressForProject(projectName) {
+      const selectedMonth = parseMonth(selectedMonthKey());
+      const dayCount = daysInMonth(selectedMonth);
+      const year = selectedMonth.getFullYear();
+      const month = selectedMonth.getMonth();
+      const rows = currentTasks().filter((task, index) => effectiveProjectKey(index) === projectName && task.name.trim());
+      if (!rows.length) return 0;
+
+      let checked = 0;
+      rows.forEach(task => {
+        for (let day = 1; day <= dayCount; day += 1) {
+          if (isCheckedOnDate(task, formatDate(new Date(year, month, day)))) checked += 1;
+        }
+      });
+
+      return Math.round((checked / (rows.length * dayCount)) * 100);
+    }
+
+    function ganttTasksForProject(projectName) {
+      const names = [];
+      currentTasks().forEach((task, index) => {
+        if (effectiveProjectKey(index) !== projectName) return;
+        const name = task.name.trim();
+        if (name && !names.includes(name)) names.push(name);
+      });
+      return names;
+    }
+
+    function ganttTaskChipsHtml(project) {
+      const projectName = project.name.trim();
+      if (!projectName) return "";
+      const allTasks = ganttTasksForProject(projectName);
+      const tasks = allTasks.slice(0, 4);
+      if (!tasks.length) return "";
+      const overflow = allTasks.length - tasks.length;
+      return `
+        <div class="gantt-task-chips" aria-label="ガントタスク">
+          ${tasks.map(task => `<span class="gantt-task-chip">${escapeAttr(task)}</span>`).join("")}
+          ${overflow > 0 ? `<span class="gantt-task-chip">+${overflow}</span>` : ""}
+        </div>
+      `;
+    }
+
+    function renderView() {
+      const projectView = state.activeView === "projects";
+      ganttPanel.hidden = projectView;
+      projectPanel.hidden = !projectView;
+      ganttActions.classList.toggle("is-hidden", projectView);
+      projectActions.classList.toggle("is-hidden", !projectView);
+      showGanttButton.classList.toggle("is-active", !projectView);
+      showProjectsButton.classList.toggle("is-active", projectView);
+      showGanttButton.setAttribute("aria-pressed", projectView ? "false" : "true");
+      showProjectsButton.setAttribute("aria-pressed", projectView ? "true" : "false");
+    }
+
+    function currentProjectView() {
+      return projectViews.some(view => view.value === state.projectView) ? state.projectView : "roadmap";
+    }
+
+    function statusLabel(value) {
+      return (projectStatuses.find(status => status.value === value) || projectStatuses[1]).label;
+    }
+
+    function projectNameFieldHtml(project) {
+      return `
+        <span class="project-name-stack">
+          <input class="project-name-input" type="text" value="${escapeAttr(project.name)}" data-field="name" aria-label="プロジェクト名">
+          ${ganttTaskChipsHtml(project)}
+        </span>
+      `;
+    }
+
+    function safeProjectName(project) {
+      return project.name.trim() || "無題プロジェクト";
+    }
+
+    function shortDate(value) {
+      if (!value) return "";
+      const date = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(date.getTime())) return value;
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
+
+    function periodText(project) {
+      const start = shortDate(project.startDate);
+      const due = shortDate(project.dueDate);
+      if (start && due) return `${start} - ${due}`;
+      if (due) return `納期 ${due}`;
+      if (start) return `着手 ${start}`;
+      return "期間未設定";
+    }
+
+    function statusSelectHtml(project) {
+      return `
+        <select class="status-select ${statusClass(project.status)}" data-field="status" aria-label="状態">
+          ${projectStatuses.map(status => `<option value="${status.value}"${status.value === project.status ? " selected" : ""}>${status.label}</option>`).join("")}
+        </select>
+      `;
+    }
+
+    function prioritySelectHtml(project) {
+      return `
+        <select class="priority-select priority-${project.priority === "高" ? "high" : project.priority === "低" ? "low" : "medium"}" data-field="priority" aria-label="優先度">
+          ${projectPriorities.map(priority => `<option value="${priority}"${priority === project.priority ? " selected" : ""}>${priority}</option>`).join("")}
+        </select>
+      `;
+    }
+
+    function progressInputHtml(project) {
+      return `
+        <span class="progress-field">
+          <input class="progress-input number-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="0" value="${escapeAttr(project.progress)}" data-field="progress" aria-label="進捗 数字のみ">
+        </span>
+      `;
+    }
+
+    function deleteProjectButtonHtml() {
+      return `<button class="delete-project" type="button" data-action="delete-project" title="削除" aria-label="プロジェクトを削除">&times;</button>`;
+    }
+
+    function bindProjectEditor(scope, project, projectIndex) {
+      scope.querySelectorAll("[data-field]").forEach(element => {
+        const field = element.dataset.field;
+        const eventName = field === "name" || field === "nextAction" || field === "progress" ? "input" : "change";
+        element.addEventListener(eventName, event => {
+          if (field === "progress") {
+            const digits = event.target.value.replace(/\D/g, "").slice(0, 3);
+            const progress = Math.max(0, Math.min(100, Number(digits) || 0));
+            event.target.value = digits ? String(progress) : "";
+            project.progress = progress;
+            if (project.progress >= 100 && project.status !== "done") project.status = "done";
+          } else {
+            project[field] = event.target.value;
+          }
+          saveState();
+          if (["status", "startDate", "dueDate"].includes(field)) renderProjectManager();
+        });
+
+        if (field === "name" || field === "nextAction") {
+          element.addEventListener("change", renderProjectManager);
+        }
+
+        if (field === "progress") {
+          element.addEventListener("change", event => {
+            if (!event.target.value) event.target.value = "0";
+            project.progress = Math.max(0, Math.min(100, Number(event.target.value) || 0));
+            saveState();
+            renderProjectManager();
+          });
+        }
+      });
+
+      const deleteButton = scope.querySelector("[data-action='delete-project']");
+      if (deleteButton) {
+        deleteButton.addEventListener("click", () => {
+          rememberState();
+          ensureProjectItems().splice(projectIndex, 1);
+          saveState();
+          renderProjectManager();
+        });
+      }
+    }
+
+    function renderProjectViewTabs() {
+      const selected = currentProjectView();
+      projectViewBar.innerHTML = `
+        ${projectViews.map(view => `
+          <button class="project-view-tab${view.value === selected ? " is-active" : ""}" type="button" data-project-view="${view.value}" aria-pressed="${view.value === selected ? "true" : "false"}">${view.label}</button>
+        `).join("")}
+      `;
+      projectViewBar.querySelectorAll("[data-project-view]").forEach(button => {
+        button.addEventListener("click", () => {
+          state.projectView = button.dataset.projectView;
+          saveState();
+          renderProjectManager();
+        });
+      });
+    }
+
+    function renderProjectOverview() {
+      const projects = ensureProjectItems().filter(project => project.name.trim() || project.startDate || project.dueDate || project.nextAction.trim());
+      const today = new Date(`${formatDate(new Date())}T00:00:00`);
+      const soonDate = new Date(`${shiftDateKey(formatDate(today), 7)}T00:00:00`);
+      const active = projects.filter(project => project.status !== "done").length;
+      const dueSoon = projects.filter(project => {
+        if (project.status === "done" || !project.dueDate) return false;
+        const due = new Date(`${project.dueDate}T00:00:00`);
+        return due >= today && due <= soonDate;
+      }).length;
+      const waiting = projects.filter(project => project.status === "waiting").length;
+      const average = projects.length
+        ? Math.round(projects.reduce((sum, project) => sum + Number(project.progress || 0), 0) / projects.length)
+        : 0;
+
+      projectOverview.innerHTML = `
+        <div class="summary-card summary-active"><span>進行中</span><strong>${active}件</strong></div>
+        <div class="summary-card summary-due"><span>7日以内の納期</span><strong>${dueSoon}件</strong></div>
+        <div class="summary-card summary-waiting"><span>確認待ち</span><strong>${waiting}件</strong></div>
+        <div class="summary-card summary-average"><span>平均進捗</span><strong>${average}%</strong></div>
+      `;
+    }
+
+    function appendTimelineDays(container, year, month, dayCount, useNumbers = false) {
+      for (let day = 1; day <= dayCount; day += 1) {
+        const date = new Date(year, month, day);
+        const marker = document.createElement(useNumbers ? "span" : "div");
+        marker.className = `${useNumbers ? "" : "timeline-day "}${classForDate(date)}`;
+        marker.style.gridColumn = String(day);
+        if (useNumbers) marker.textContent = String(day);
+        container.appendChild(marker);
+      }
+    }
+
+    function createTimelineTrack(project, year, month, dayCount, monthKey, options = {}) {
+      const track = document.createElement("div");
+      track.className = `timeline-track${options.mini ? " is-mini" : ""}`;
+      appendTimelineDays(track, year, month, dayCount);
+      const position = timelinePosition(project, monthKey);
+      if (position) {
+        const endDay = position.startDay + position.span - 1;
+        const bar = document.createElement("div");
+        bar.className = `roadmap-bar ${statusClass(project.status)}`;
+        bar.style.gridColumn = `${position.startDay} / span ${position.span}`;
+        bar.innerHTML = `<span class="roadmap-bar-label">${shortDate(project.startDate)} - ${shortDate(project.dueDate)}</span>`;
+        track.appendChild(bar);
+
+        const dot = document.createElement("span");
+        dot.className = `roadmap-due-dot ${statusClass(project.status)}`;
+        dot.style.gridColumn = String(endDay);
+        track.appendChild(dot);
+
+        const label = document.createElement("span");
+        label.className = "roadmap-due-label";
+        label.style.gridColumn = String(Math.min(endDay + 1, dayCount));
+        label.textContent = shortDate(project.dueDate);
+        track.appendChild(label);
+      } else {
+        const placeholder = document.createElement("span");
+        placeholder.className = "roadmap-placeholder";
+        placeholder.textContent = project.startDate && project.dueDate ? "この月の期間外" : "着手日と納期を入力";
+        track.appendChild(placeholder);
+      }
+      return track;
+    }
+
+    function renderRoadmapView(projects, context) {
+      projectRoadmap.className = "project-roadmap project-board is-roadmap";
+      projectRoadmap.style.setProperty("--roadmap-days", context.dayCount);
+
+      ["", "プロジェクト名", "状態", "優先度", "着手日", "納期", "進捗%", "次アクション", `${context.year}年${context.month + 1}月`].forEach((label, index) => {
+        const head = document.createElement("div");
+        head.className = index === 8 ? "roadmap-timeline-head" : "roadmap-head-cell";
+        if (index === 8) {
+          const timeline = document.createElement("div");
+          timeline.className = "timeline-head";
+          appendTimelineDays(timeline, context.year, context.month, context.dayCount, true);
+          head.appendChild(timeline);
+        } else {
+          head.textContent = label;
+        }
+        projectRoadmap.appendChild(head);
+      });
+
+      projects.forEach((project, projectIndex) => {
+        [
+          `<span class="roadmap-handle-mark">⋮⋮</span>`,
+          projectNameFieldHtml(project),
+          statusSelectHtml(project),
+          prioritySelectHtml(project),
+          `<input type="date" value="${escapeAttr(project.startDate)}" data-field="startDate" aria-label="着手日">`,
+          `<input type="date" value="${escapeAttr(project.dueDate)}" data-field="dueDate" aria-label="納期">`,
+          progressInputHtml(project),
+          `<input type="text" value="${escapeAttr(project.nextAction)}" data-field="nextAction" aria-label="次アクション">`
+        ].forEach((html, index) => {
+          const cell = document.createElement("div");
+          const status = statusClass(project.status);
+          cell.className = index === 0
+            ? "roadmap-field-cell roadmap-handle"
+            : `roadmap-field-cell ${status}${index === 1 ? " roadmap-name-cell" : ""}`;
+          cell.innerHTML = html;
+          bindProjectEditor(cell, project, projectIndex);
+          projectRoadmap.appendChild(cell);
+        });
+
+        const timelineCell = document.createElement("div");
+        timelineCell.className = "roadmap-timeline-cell";
+        timelineCell.appendChild(createTimelineTrack(project, context.year, context.month, context.dayCount, context.monthKey));
+        projectRoadmap.appendChild(timelineCell);
+      });
+    }
+
+    function projectCardHtml(project) {
+      return `
+        <div class="project-card-head">
+          ${projectNameFieldHtml(project)}
+          ${deleteProjectButtonHtml()}
+        </div>
+        <div class="project-card-fields">
+          <label class="project-field"><span>状態</span>${statusSelectHtml(project)}</label>
+          <label class="project-field"><span>優先度</span>${prioritySelectHtml(project)}</label>
+          <label class="project-field"><span>着手日</span><input type="date" value="${escapeAttr(project.startDate)}" data-field="startDate" aria-label="着手日"></label>
+          <label class="project-field"><span>納期</span><input type="date" value="${escapeAttr(project.dueDate)}" data-field="dueDate" aria-label="納期"></label>
+        </div>
+        <label class="project-field"><span>進捗%</span>${progressInputHtml(project)}</label>
+        <div class="project-card-progress">
+          <div class="mini-progress ${statusClass(project.status)}" style="--progress: ${project.progress}%"><span></span></div>
+        </div>
+        <label class="project-field"><span>次アクション</span><input type="text" value="${escapeAttr(project.nextAction)}" data-field="nextAction" aria-label="次アクション"></label>
+      `;
+    }
+
+    function renderCardsView(projects) {
+      projectRoadmap.className = "project-roadmap project-board is-cards";
+      projects.forEach((project, projectIndex) => {
+        const card = document.createElement("article");
+        card.className = `project-card ${statusClass(project.status)}`;
+        card.innerHTML = projectCardHtml(project);
+        bindProjectEditor(card, project, projectIndex);
+        projectRoadmap.appendChild(card);
+      });
+    }
+
+    function appendListCell(content, className = "") {
+      const cell = document.createElement("div");
+      cell.className = className ? `list-cell ${className}` : "list-cell";
+      if (typeof content === "string") {
+        cell.innerHTML = content;
+      } else {
+        cell.appendChild(content);
+      }
+      projectRoadmap.appendChild(cell);
+      return cell;
+    }
+
+    function renderListView(projects, context) {
+      projectRoadmap.className = "project-roadmap project-board is-list";
+      ["プロジェクト", "状態", "優先度", "着手日", "納期", "進捗%", "タイムライン", "次アクション", ""].forEach(label => {
+        const head = document.createElement("div");
+        head.className = "list-head";
+        head.textContent = label;
+        projectRoadmap.appendChild(head);
+      });
+
+      projects.forEach((project, projectIndex) => {
+        [
+          `<input class="project-name-input" type="text" value="${escapeAttr(project.name)}" data-field="name" aria-label="プロジェクト名">`,
+          statusSelectHtml(project),
+          prioritySelectHtml(project),
+          `<input type="date" value="${escapeAttr(project.startDate)}" data-field="startDate" aria-label="着手日">`,
+          `<input type="date" value="${escapeAttr(project.dueDate)}" data-field="dueDate" aria-label="納期">`,
+          progressInputHtml(project)
+        ].forEach((html, index) => {
+          const cell = appendListCell(html, index === 0 ? `list-name-cell ${statusClass(project.status)}` : "");
+          bindProjectEditor(cell, project, projectIndex);
+        });
+
+        const timelineCell = appendListCell(createTimelineTrack(project, context.year, context.month, context.dayCount, context.monthKey, { mini: true }));
+        timelineCell.classList.add("timeline-list-cell");
+
+        const nextCell = appendListCell(`<input type="text" value="${escapeAttr(project.nextAction)}" data-field="nextAction" aria-label="次アクション">`);
+        bindProjectEditor(nextCell, project, projectIndex);
+
+        const deleteCell = appendListCell(deleteProjectButtonHtml());
+        bindProjectEditor(deleteCell, project, projectIndex);
+      });
+    }
+
+    function renderProjectManager() {
+      const selectedMonth = parseMonth(monthInput.value);
+      const context = {
+        dayCount: daysInMonth(selectedMonth),
+        year: selectedMonth.getFullYear(),
+        month: selectedMonth.getMonth(),
+        monthKey: selectedMonthKey()
+      };
+      const projects = ensureProjectItems();
+      const view = currentProjectView();
+
+      projectMeta.textContent = `${context.year}年${context.month + 1}月`;
+      projectRoadmap.innerHTML = "";
+      projectRoadmap.style.setProperty("--roadmap-days", context.dayCount);
+      renderProjectOverview();
+      renderProjectViewTabs();
+
+      if (!projects.length) {
+        projectRoadmap.className = "project-roadmap project-board";
+        projectRoadmap.innerHTML = `<div class="project-empty">プロジェクト追加からはじめられます。</div>`;
+        return;
+      }
+
+      if (view === "cards") renderCardsView(projects, context);
+      else renderRoadmapView(projects, context);
+    }
+
+    function render() {
+      renderView();
+      const selectedMonth = parseMonth(monthInput.value);
+      const dayCount = daysInMonth(selectedMonth);
+      const year = selectedMonth.getFullYear();
+      const month = selectedMonth.getMonth();
+      const tasks = currentTasks();
+
+      board.innerHTML = "";
+      board.style.setProperty("--days", dayCount);
+      board.style.setProperty("--rows", tasks.length);
+
+      sheetTitle.textContent = DEFAULT_TITLE;
+      sheetMeta.textContent = `${year}年${month + 1}月`;
+
+      const monthPanel = document.createElement("div");
+      monthPanel.className = "month-panel";
+      monthPanel.innerHTML = `
+        <span class="month-number">${month + 1}</span>
+        <span class="month-name">${monthNames[month]}</span>
+        <span class="year-name">${year}年</span>
+      `;
+      board.appendChild(monthPanel);
+
+      const taskHead = document.createElement("div");
+      taskHead.className = "task-head";
+      taskHead.textContent = "タスク";
+      board.appendChild(taskHead);
+
+      const projectHead = document.createElement("div");
+      projectHead.className = "project-head";
+      projectHead.textContent = "プロジェクト";
+      board.appendChild(projectHead);
+
+      for (let day = 1; day <= dayCount; day += 1) {
+        const date = new Date(year, month, day);
+        const dateKey = formatDate(date);
+        const head = document.createElement("div");
+        head.className = `date-head ${classForDate(date)}`;
+        head.style.gridColumn = String(day + 3);
+        head.style.gridRow = "1";
+        head.setAttribute("role", "button");
+        head.setAttribute("tabindex", "0");
+        head.setAttribute("aria-label", `${month + 1}月${day}日の日報リストを表示`);
+        head.innerHTML = `
+          <span class="day-num">${day}</span>
+          <span class="weekday">${weekdays[date.getDay()]}</span>
+        `;
+        head.addEventListener("click", () => {
+          reportDateInput.value = dateKey;
+          saveState();
+          renderReport();
+        });
+        head.addEventListener("keydown", event => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          reportDateInput.value = dateKey;
+          saveState();
+          renderReport();
+        });
+        board.appendChild(head);
+      }
+
+      tasks.forEach((task, taskIndex) => {
+        const row = taskIndex + 2;
+        const groupStart = isGroupStart(taskIndex);
+        const canDragProject = groupStart && Boolean(effectiveProjectKey(taskIndex));
+        const groupEven = effectiveProjectKey(taskIndex) && projectGroupIndex(taskIndex) % 2 === 1;
+        const groupClasses = `${groupStart ? " group-start" : ""}${groupEven ? " group-even" : ""}`;
+
+        const projectCell = document.createElement("div");
+        projectCell.className = `project-cell${groupClasses}${canDragProject ? " has-drag" : ""}`;
+        projectCell.style.gridColumn = "2";
+        projectCell.style.gridRow = String(row);
+        projectCell.innerHTML = `
+          ${canDragProject ? '<button class="project-drag-handle" type="button" draggable="true" title="プロジェクトを移動" aria-label="プロジェクトを移動">↕</button>' : ""}
+          <input class="project-input" type="text" value="${escapeAttr(task.project)}" aria-label="プロジェクト名">
+        `;
+        const dragHandle = projectCell.querySelector(".project-drag-handle");
+        if (dragHandle) {
+          dragHandle.addEventListener("dragstart", event => {
+            draggingProjectStart = taskIndex;
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", String(taskIndex));
+          });
+          dragHandle.addEventListener("dragend", () => {
+            draggingProjectStart = null;
+            clearDragTargets();
+          });
+        }
+        projectCell.addEventListener("dragover", event => {
+          if (draggingProjectStart === null || !groupForRow(taskIndex)) return;
+          event.preventDefault();
+          const placement = event.offsetY > projectCell.clientHeight / 2 ? "after" : "before";
+          clearDragTargets();
+          projectCell.classList.add(placement === "after" ? "drag-target-after" : "drag-target-before");
+        });
+        projectCell.addEventListener("dragleave", () => {
+          projectCell.classList.remove("drag-target-before", "drag-target-after");
+        });
+        projectCell.addEventListener("drop", event => {
+          if (draggingProjectStart === null) return;
+          event.preventDefault();
+          const placement = event.offsetY > projectCell.clientHeight / 2 ? "after" : "before";
+          moveProjectGroup(draggingProjectStart, taskIndex, placement);
+          draggingProjectStart = null;
+          clearDragTargets();
+        });
+        const projectInput = projectCell.querySelector(".project-input");
+        projectInput.addEventListener("input", () => {
+          task.project = projectInput.value;
+          saveState();
+        });
+        projectInput.addEventListener("change", () => {
+          render();
+        });
+        board.appendChild(projectCell);
+
+        const taskCell = document.createElement("div");
+        taskCell.className = `task-cell${groupClasses}`;
+        taskCell.style.gridColumn = "3";
+        taskCell.style.gridRow = String(row);
+        taskCell.innerHTML = `
+          <input class="task-input" type="text" value="${escapeAttr(task.name)}" aria-label="タスク名">
+          <details class="row-menu">
+            <summary title="行メニュー" aria-label="行メニュー">...</summary>
+            <div class="row-menu-popover">
+              <button class="menu-action add-above-row" type="button">上に追加</button>
+              <button class="menu-action add-below-row" type="button">下に追加</button>
+              <button class="menu-action remove-row" type="button">削除</button>
+            </div>
+          </details>
+        `;
+        const input = taskCell.querySelector(".task-input");
+        input.addEventListener("input", () => {
+          task.name = input.value;
+          saveState();
+        });
+        taskCell.querySelector(".add-above-row").addEventListener("click", () => {
+          insertRow(taskIndex, "above");
+        });
+        taskCell.querySelector(".add-below-row").addEventListener("click", () => {
+          insertRow(taskIndex, "below");
+        });
+        taskCell.querySelector(".remove-row").addEventListener("click", () => {
+          rememberState();
+          tasks.splice(taskIndex, 1);
+          if (!tasks.length) tasks.push(makeTask("", ""));
+          saveState();
+          render();
+        });
+        taskCell.querySelector(".row-menu").addEventListener("toggle", event => {
+          taskCell.classList.toggle("menu-open", event.target.open);
+        });
+        board.appendChild(taskCell);
+
+        for (let day = 1; day <= dayCount; day += 1) {
+          const date = new Date(year, month, day);
+          const dateKey = formatDate(date);
+          const cell = document.createElement("button");
+          cell.type = "button";
+          cell.className = `check-cell ${classForDate(date)}${task.checks[dateKey] ? " is-checked" : ""}${groupStart ? " group-start" : ""}`;
+          cell.style.gridColumn = String(day + 3);
+          cell.style.gridRow = String(row);
+          const ariaProject = task.project ? `${task.project} ` : "";
+          cell.setAttribute("aria-label", `${ariaProject}${task.name || "タスク"} ${month + 1}月${day}日`);
+          cell.setAttribute("aria-pressed", task.checks[dateKey] ? "true" : "false");
+          cell.addEventListener("click", () => {
+            rememberState();
+            reportDateInput.value = dateKey;
+            if (task.checks[dateKey]) {
+              delete task.checks[dateKey];
+            } else {
+              task.checks[dateKey] = true;
+            }
+            saveState();
+            render();
+          });
+          board.appendChild(cell);
+        }
+      });
+      renderReport();
+      renderProjectManager();
+    }
+
+    function escapeAttr(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function clearVisibleMonthChecks() {
+      if (!window.confirm("今月分のプロジェクト・タスク・チェックをすべて削除します。よろしいですか？")) return;
+      rememberState();
+      ensureMonth().tasks = blankTasks();
+      saveState();
+      render();
+    }
+
+    function removeBlankRows() {
+      rememberState();
+      const monthRecord = ensureMonth();
+      monthRecord.tasks = monthRecord.tasks.filter(task => task.project.trim() || task.name.trim() || Object.keys(task.checks).length);
+      if (!monthRecord.tasks.length) monthRecord.tasks = blankTasks();
+      saveState();
+      render();
+    }
+
+    function copyPreviousMonthTasks() {
+      rememberState();
+      const currentMonth = selectedMonthKey();
+      const previousMonth = previousMonthKey(currentMonth);
+      const sourceRecord = state.months && state.months[previousMonth]
+        ? normalizeMonthRecord(state.months[previousMonth])
+        : { tasks: [] };
+      const sourceTasks = sourceRecord.tasks;
+      const copiedTasks = sourceTasks
+        .filter(task => task.project.trim() || task.name.trim())
+        .map(task => makeTask(task.project, task.name));
+
+      ensureMonth(currentMonth).tasks = copiedTasks.length
+        ? [...copiedTasks, makeTask("", ""), makeTask("", "")]
+        : blankTasks();
+
+      saveState();
+      render();
+    }
+
+    function switchView(view) {
+      state.activeView = view;
+      saveState();
+      render();
+    }
+
+    function addProjectItem() {
+      rememberState();
+      const monthKey = selectedMonthKey();
+      ensureProjectItems().push(makeProjectItem("", {
+        status: "active",
+        priority: "中",
+        startDate: `${monthKey}-01`,
+        dueDate: endOfMonthKey(monthKey),
+        progress: 0,
+        nextAction: ""
+      }));
+      saveState();
+      render();
+    }
+
+    function importProjectsFromGantt() {
+      const projects = ensureProjectItems();
+      const existing = new Map(projects.map(project => [project.name.trim(), project]).filter(([name]) => name));
+      const additions = [];
+      const groups = projectGroups().filter(group => group.key);
+
+      if (!groups.length) {
+        window.alert("ガント側に反映できるプロジェクトがありません。");
+        return;
+      }
+
+      rememberState();
+      groups.forEach(group => {
+        const progress = checkedProgressForProject(group.key);
+        const taskNames = ganttTasksForProject(group.key);
+        const nextAction = taskNames[0] || "";
+        const existingProject = existing.get(group.key);
+
+        if (existingProject) {
+          existingProject.progress = progress;
+          if (progress >= 100 || existingProject.status === "active" || existingProject.status === "not-started") {
+            existingProject.status = statusForProgress(progress);
+          }
+          if (!existingProject.nextAction.trim() && nextAction) existingProject.nextAction = nextAction;
+          return;
+        }
+
+        additions.push(makeProjectItem(group.key, {
+          status: statusForProgress(progress),
+          priority: "中",
+          startDate: `${selectedMonthKey()}-01`,
+          dueDate: endOfMonthKey(selectedMonthKey()),
+          progress,
+          nextAction
+        }));
+        existing.set(group.key, additions[additions.length - 1]);
+      });
+
+      state.projectItems.push(...additions);
+      saveState();
+      render();
+    }
+
+    monthInput.value = state.month || currentMonthValue();
+    ensureMonth(monthInput.value);
+    ensureProjectItems();
+    reportDateInput.value = state.reportDate || preferredReportDate(monthInput.value);
+    showGanttButton.addEventListener("click", () => switchView("gantt"));
+    showProjectsButton.addEventListener("click", () => switchView("projects"));
+    monthInput.addEventListener("change", () => {
+      changeMonth(monthInput.value);
+    });
+    document.getElementById("prevMonth").addEventListener("click", () => {
+      changeMonth(shiftMonthKey(selectedMonthKey(), -1));
+    });
+    document.getElementById("currentMonth").addEventListener("click", () => {
+      changeMonth(currentMonthValue());
+    });
+    document.getElementById("nextMonth").addEventListener("click", () => {
+      changeMonth(shiftMonthKey(selectedMonthKey(), 1));
+    });
+    reportDateInput.addEventListener("change", () => {
+      saveState();
+      renderReport();
+    });
+    document.getElementById("addRow").addEventListener("click", () => {
+      rememberState();
+      currentTasks().push(makeTask("", ""));
+      saveState();
+      render();
+    });
+    document.getElementById("copyPreviousMonth").addEventListener("click", copyPreviousMonthTasks);
+    document.getElementById("removeBlankRows").addEventListener("click", removeBlankRows);
+    document.getElementById("clearMonth").addEventListener("click", clearVisibleMonthChecks);
+    document.getElementById("printButton").addEventListener("click", () => window.print());
+    document.getElementById("addProject").addEventListener("click", addProjectItem);
+    document.getElementById("importProjects").addEventListener("click", importProjectsFromGantt);
+    document.getElementById("printProjects").addEventListener("click", () => window.print());
+    copyReportButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(reportText.value);
+      } catch (error) {
+        reportText.select();
+        document.execCommand("copy");
+      }
+      copyReportButton.textContent = "コピー済み";
+      window.setTimeout(() => {
+        copyReportButton.textContent = "コピー";
+      }, 1200);
+    });
+    document.addEventListener("keydown", event => {
+      const key = event.key.toLowerCase();
+      const modifier = event.metaKey || event.ctrlKey;
+      const undo = modifier && key === "z" && !event.shiftKey;
+      const redo = modifier && ((key === "z" && event.shiftKey) || key === "y");
+
+      if ((!undo && !redo) || isEditingText(event)) return;
+
+      event.preventDefault();
+      if (undo) undoState();
+      if (redo) redoState();
+    });
+
+    render();
+  </script>
+</body>
+</html>
