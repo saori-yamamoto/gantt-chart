@@ -28,7 +28,7 @@
       --done: #2fb36d;
       --done-soft: #e8f8ef;
       --month-col: 72px;
-      --project-col: 130px;
+      --project-col: 180px;
       --task-col: 160px;
       font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "YuGothic", "Segoe UI", sans-serif;
     }
@@ -233,7 +233,7 @@
     }
 
     .report-panel {
-      display: grid;
+      display: none;
       gap: 12px;
       margin: 0 12px 14px;
       padding: 14px;
@@ -1073,7 +1073,7 @@
 
     .project-board.is-roadmap {
       display: grid;
-      grid-template-columns: 24px minmax(150px, 1fr) 92px 72px 96px 96px 70px minmax(150px, 1fr) minmax(calc(var(--roadmap-days) * 20px), 1.6fr);
+      grid-template-columns: 24px minmax(180px, 1.1fr) 92px 72px 96px 96px 70px minmax(150px, 1fr) minmax(calc(var(--roadmap-days) * 20px), 1.6fr);
       grid-auto-rows: minmax(72px, auto);
       min-width: calc(760px + var(--roadmap-days) * 20px);
       border-left: 1px solid var(--line-soft);
@@ -1618,7 +1618,7 @@
   </main>
 
   <script>
-    const STORAGE_KEY = "demoGanttChartDataV1";
+    const STORAGE_KEY = "demoGanttChartDataV2";
     const monthInput = document.getElementById("monthInput");
     const board = document.getElementById("calendarBoard");
     const sheetTitle = document.getElementById("sheetTitle");
@@ -1728,13 +1728,13 @@
         makeTask("", "ワイヤーフレーム"),
         makeTask("", "デザイン確認"),
         makeTask("", "コーディング"),
-        makeTask("SNSキャンペーン", "投稿案作成"),
-        makeTask("", "画像作成"),
-        makeTask("", "予約投稿"),
         makeTask("業務改善", "ヒアリング"),
         makeTask("", "テンプレ整備"),
         makeTask("定例・MTG", "週次定例"),
         makeTask("", "議事録作成"),
+        makeTask("", ""),
+        makeTask("", ""),
+        makeTask("", ""),
         makeTask("", "")
       ];
     }
@@ -1748,9 +1748,7 @@
       const monthStart = `${monthKey}-01`;
       const monthEnd = endOfMonthKey(monthKey);
       const selectedMonth = parseMonth(monthKey);
-      const firstWeek = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 5));
       const midMonth = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 12));
-      const lateMonth = formatDate(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 21));
 
       return [
         makeProjectItem("Webサイトリニューアル", {
@@ -1760,14 +1758,6 @@
           dueDate: monthEnd,
           progress: 45,
           nextAction: "ワイヤーフレーム確認"
-        }),
-        makeProjectItem("SNSキャンペーン", {
-          status: "waiting",
-          priority: "中",
-          startDate: firstWeek,
-          dueDate: lateMonth,
-          progress: 30,
-          nextAction: "投稿案レビュー"
         }),
         makeProjectItem("業務改善", {
           status: "not-started",
